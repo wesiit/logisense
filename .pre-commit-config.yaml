@@ -15,9 +15,8 @@ repos:
     rev: v1.13.0
     hooks:
       - id: mypy
-        additional_dependencies: []
+        additional_dependencies: [types-requests]
         args: [--config-file=pyproject.toml]
-        pass_filenames: false
 
   # Prettier - Format non-Python files
   - repo: https://github.com/pre-commit/mirrors-prettier

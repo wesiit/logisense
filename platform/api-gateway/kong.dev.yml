@@ -3,88 +3,233 @@ _transform: true
 
 # ==============================================================================
 # LogiSense Kong API Gateway - Development Configuration
+# Kong OSS 3.6 DB-less Mode (deck format)
+# ==============================================================================
+# JWT validation is enabled on all module routes.
+# For development, using HS256 with a shared secret.
+# For production, configure RS256 with Keycloak's public key.
 # ==============================================================================
 
+# ==============================================================================
+# Consumers (for JWT validation)
+# ==============================================================================
+consumers:
+  - username: logisense-service
+    custom_id: logisense-jwt-consumer
+    jwt_secrets:
+      - key: logisense-issuer
+        algorithm: HS256
+        secret: logisense-dev-jwt-secret-change-in-production
+
+# ==============================================================================
+# Services and Routes
+# ==============================================================================
 services:
   # ---------------------------------------------------------------------------
-  # Module APIs
+  # Module APIs (JWT Protected)
   # ---------------------------------------------------------------------------
-  - name: iwms-api
-    url: http://host.docker.internal:3001
+  - name: iwms-service
+    url: http://iwms-api:8001
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 3
     routes:
       - name: iwms-route
         paths:
-          - /api/v1/iwms
+          - /v1/iwms
         strip_path: false
+        preserve_host: true
+        protocols:
+          - http
+          - https
+    plugins:
+      - name: jwt
+        config:
+          key_claim_name: iss
+          claims_to_verify:
+            - exp
 
-  - name: lip-api
-    url: http://host.docker.internal:3002
+  - name: lip-service
+    url: http://lip-api:8002
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 3
     routes:
       - name: lip-route
         paths:
-          - /api/v1/lip
+          - /v1/lip
         strip_path: false
+        preserve_host: true
+        protocols:
+          - http
+          - https
+    plugins:
+      - name: jwt
+        config:
+          key_claim_name: iss
+          claims_to_verify:
+            - exp
 
-  - name: ccvp-api
-    url: http://host.docker.internal:3003
+  - name: ccvp-service
+    url: http://ccvp-api:8003
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 3
     routes:
       - name: ccvp-route
         paths:
-          - /api/v1/ccvp
+          - /v1/ccvp
         strip_path: false
+        preserve_host: true
+        protocols:
+          - http
+          - https
+    plugins:
+      - name: jwt
+        config:
+          key_claim_name: iss
+          claims_to_verify:
+            - exp
 
-  - name: pise-api
-    url: http://host.docker.internal:3004
+  - name: pise-service
+    url: http://pise-api:8004
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 3
     routes:
       - name: pise-route
         paths:
-          - /api/v1/pise
+          - /v1/pise
         strip_path: false
+        preserve_host: true
+        protocols:
+          - http
+          - https
+    plugins:
+      - name: jwt
+        config:
+          key_claim_name: iss
+          claims_to_verify:
+            - exp
 
-  - name: wcvp-api
-    url: http://host.docker.internal:3005
+  - name: wcvp-service
+    url: http://wcvp-api:8005
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 3
     routes:
       - name: wcvp-route
         paths:
-          - /api/v1/wcvp
+          - /v1/wcvp
         strip_path: false
+        preserve_host: true
+        protocols:
+          - http
+          - https
+    plugins:
+      - name: jwt
+        config:
+          key_claim_name: iss
+          claims_to_verify:
+            - exp
 
-  - name: uoih-api
-    url: http://host.docker.internal:3006
+  - name: uoih-service
+    url: http://uoih-api:8006
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 3
     routes:
       - name: uoih-route
         paths:
-          - /api/v1/uoih
+          - /v1/uoih
         strip_path: false
+        preserve_host: true
+        protocols:
+          - http
+          - https
+    plugins:
+      - name: jwt
+        config:
+          key_claim_name: iss
+          claims_to_verify:
+            - exp
 
   # ---------------------------------------------------------------------------
-  # Platform Services
+  # Platform Services (JWT Protected)
   # ---------------------------------------------------------------------------
-  - name: identity-api
-    url: http://keycloak:8080
-    routes:
-      - name: identity-route
-        paths:
-          - /auth
-        strip_path: false
-
-  - name: license-api
-    url: http://host.docker.internal:3010
+  - name: license-service
+    url: http://license-api:8007
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 3
     routes:
       - name: license-route
         paths:
-          - /api/v1/license
+          - /v1/license
         strip_path: false
+        preserve_host: true
+        protocols:
+          - http
+          - https
+    plugins:
+      - name: jwt
+        config:
+          key_claim_name: iss
+          claims_to_verify:
+            - exp
+
+  # ---------------------------------------------------------------------------
+  # Health Check (No Auth)
+  # ---------------------------------------------------------------------------
+  - name: health-service
+    url: http://localhost:8001/status
+    routes:
+      - name: health-route
+        paths:
+          - /health
+        strip_path: true
+        protocols:
+          - http
+          - https
 
 # ==============================================================================
-# Plugins (Global)
+# Global Plugins
 # ==============================================================================
 plugins:
+  # ---------------------------------------------------------------------------
+  # Correlation ID - Generate X-Request-ID for request tracing
+  # ---------------------------------------------------------------------------
+  - name: correlation-id
+    config:
+      header_name: X-Request-ID
+      generator: uuid
+      echo_downstream: true
+
+  # ---------------------------------------------------------------------------
+  # Request Size Limiting - Max 10MB payload
+  # ---------------------------------------------------------------------------
+  - name: request-size-limiting
+    config:
+      allowed_payload_size: 10
+      size_unit: megabytes
+      require_content_length: false
+
+  # ---------------------------------------------------------------------------
+  # CORS - Cross-Origin Resource Sharing
+  # ---------------------------------------------------------------------------
   - name: cors
     config:
       origins:
         - http://localhost:3000
         - http://localhost:5173
+        - https://*.logisense.io
       methods:
         - GET
         - POST
@@ -92,24 +237,36 @@ plugins:
         - PATCH
         - DELETE
         - OPTIONS
+        - HEAD
       headers:
         - Accept
+        - Accept-Version
         - Authorization
+        - Content-Length
         - Content-Type
+        - Content-MD5
+        - Date
+        - X-Auth-Token
         - X-Request-ID
         - X-Tenant-ID
+        - X-Facility-ID
       exposed_headers:
         - X-Request-ID
+        - X-RateLimit-Limit
+        - X-RateLimit-Remaining
       credentials: true
       max_age: 3600
-
-  - name: correlation-id
-    config:
-      header_name: X-Request-ID
-      generator: uuid
-      echo_downstream: true
-
-  - name: rate-limiting
-    config:
-      minute: 1000
-      policy: local
+      preflight_continue: false
+# ==============================================================================
+# Response Rate Limiting - Placeholder (disabled in development)
+# ==============================================================================
+# Uncomment for production:
+#
+# - name: response-ratelimiting
+#   config:
+#     limits:
+#       default:
+#         minute: 1000
+#     policy: local
+#     fault_tolerant: true
+#     hide_client_headers: false

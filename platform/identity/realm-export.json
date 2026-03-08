@@ -1,0 +1,233 @@
+{
+  "realm": "logisense",
+  "enabled": true,
+  "displayName": "LogiSense",
+  "displayNameHtml": "<strong>LogiSense</strong>",
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "maxFailureWaitSeconds": 900,
+  "minimumQuickLoginWaitSeconds": 60,
+  "waitIncrementSeconds": 60,
+  "quickLoginCheckMilliSeconds": 1000,
+  "maxDeltaTimeSeconds": 43200,
+  "failureFactor": 5,
+  "roles": {
+    "realm": [
+      {
+        "name": "platform-admin",
+        "description": "Platform administrator with full access"
+      },
+      {
+        "name": "tenant-admin",
+        "description": "Tenant administrator"
+      },
+      {
+        "name": "warehouse-manager",
+        "description": "Warehouse operations manager"
+      },
+      {
+        "name": "warehouse-operator",
+        "description": "Warehouse floor operator"
+      },
+      {
+        "name": "analyst",
+        "description": "Business analyst with read access"
+      }
+    ],
+    "client": {
+      "logisense-api": [
+        {
+          "name": "iwms:read",
+          "description": "Read access to iWMS module"
+        },
+        {
+          "name": "iwms:write",
+          "description": "Write access to iWMS module"
+        },
+        {
+          "name": "lip:read",
+          "description": "Read access to LIP module"
+        },
+        {
+          "name": "lip:write",
+          "description": "Write access to LIP module"
+        },
+        {
+          "name": "ccvp:read",
+          "description": "Read access to CCVP module"
+        },
+        {
+          "name": "ccvp:write",
+          "description": "Write access to CCVP module"
+        },
+        {
+          "name": "pise:read",
+          "description": "Read access to PISE module"
+        },
+        {
+          "name": "pise:write",
+          "description": "Write access to PISE module"
+        },
+        {
+          "name": "wcvp:read",
+          "description": "Read access to WCVP module"
+        },
+        {
+          "name": "wcvp:write",
+          "description": "Write access to WCVP module"
+        },
+        {
+          "name": "uoih:read",
+          "description": "Read access to UOIH module"
+        },
+        {
+          "name": "uoih:write",
+          "description": "Write access to UOIH module"
+        }
+      ]
+    }
+  },
+  "clients": [
+    {
+      "clientId": "logisense-api",
+      "name": "LogiSense API",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "logisense-api-secret-dev",
+      "bearerOnly": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "publicClient": false,
+      "protocol": "openid-connect"
+    },
+    {
+      "clientId": "logisense-web",
+      "name": "LogiSense Web Application",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["http://localhost:3000/*", "http://localhost:5173/*"],
+      "webOrigins": ["http://localhost:3000", "http://localhost:5173"],
+      "protocol": "openid-connect"
+    },
+    {
+      "clientId": "logisense-mobile",
+      "name": "LogiSense Mobile Application",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["logisense://callback", "http://localhost:8081/*"],
+      "protocol": "openid-connect"
+    }
+  ],
+  "users": [
+    {
+      "username": "dev-admin",
+      "email": "admin@logisense.dev",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Dev",
+      "lastName": "Admin",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["platform-admin"],
+      "clientRoles": {
+        "logisense-api": [
+          "iwms:read",
+          "iwms:write",
+          "lip:read",
+          "lip:write",
+          "ccvp:read",
+          "ccvp:write",
+          "pise:read",
+          "pise:write",
+          "wcvp:read",
+          "wcvp:write",
+          "uoih:read",
+          "uoih:write"
+        ]
+      }
+    },
+    {
+      "username": "dev-manager",
+      "email": "manager@logisense.dev",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Dev",
+      "lastName": "Manager",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "manager123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["warehouse-manager"],
+      "clientRoles": {
+        "logisense-api": [
+          "iwms:read",
+          "iwms:write",
+          "lip:read",
+          "ccvp:read",
+          "wcvp:read"
+        ]
+      }
+    },
+    {
+      "username": "dev-operator",
+      "email": "operator@logisense.dev",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Dev",
+      "lastName": "Operator",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "operator123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["warehouse-operator"],
+      "clientRoles": {
+        "logisense-api": ["iwms:read"]
+      }
+    }
+  ],
+  "clientScopes": [
+    {
+      "name": "logisense-scope",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true"
+      },
+      "protocolMappers": [
+        {
+          "name": "tenant-id-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "tenant_id",
+            "claim.name": "tenant_id",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ]
+}

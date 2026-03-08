@@ -27,6 +27,11 @@ docker compose -f docker-compose.dev.yml up -d --wait
 echo ""
 echo "✅ All services are running!"
 echo ""
+
+# Initialize Keycloak test users
+echo "🔐 Initializing Keycloak test users..."
+"$SCRIPT_DIR/init-keycloak-users.sh"
+echo ""
 echo "╔══════════════════════════════════════════════════════════════════════════╗"
 echo "║                           Service URLs                                   ║"
 echo "╠══════════════════════════════════════════════════════════════════════════╣"

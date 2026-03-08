@@ -1,0 +1,180 @@
+# ==============================================================================
+# LogiSense Dev Deployment Pipeline
+# ==============================================================================
+# Triggered on push to main
+# Builds and pushes Docker images to GitHub Container Registry
+# ==============================================================================
+
+name: Deploy Dev
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "modules/**"
+      - "platform/**"
+      - "Dockerfile*"
+      - ".github/workflows/deploy-dev.yml"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository }}
+
+jobs:
+  # ============================================================================
+  # Build Matrix
+  # ============================================================================
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      modules: ${{ steps.filter.outputs.changes }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Detect changed modules
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            iwms:
+              - 'modules/iwms/**'
+            lip:
+              - 'modules/lip/**'
+            ccvp:
+              - 'modules/ccvp/**'
+            pise:
+              - 'modules/pise/**'
+            wcvp:
+              - 'modules/wcvp/**'
+            uoih:
+              - 'modules/uoih/**'
+            license-service:
+              - 'platform/license-service/**'
+
+  # ============================================================================
+  # Build and Push Images
+  # ============================================================================
+  build-push:
+    name: Build ${{ matrix.module }}
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.modules != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        module: ${{ fromJson(needs.changes.outputs.modules) }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Determine build context
+        id: context
+        run: |
+          if [ "${{ matrix.module }}" = "license-service" ]; then
+            echo "path=platform/license-service" >> $GITHUB_OUTPUT
+            echo "image_name=license-service" >> $GITHUB_OUTPUT
+          else
+            echo "path=modules/${{ matrix.module }}" >> $GITHUB_OUTPUT
+            echo "image_name=${{ matrix.module }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check for Dockerfile
+        id: check-dockerfile
+        run: |
+          if [ -f "${{ steps.context.outputs.path }}/Dockerfile" ]; then
+            echo "has_dockerfile=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_dockerfile=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Extract metadata
+        if: steps.check-dockerfile.outputs.has_dockerfile == 'true'
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ steps.context.outputs.image_name }}
+          tags: |
+            type=sha,prefix=
+            type=raw,value=dev
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build and push
+        if: steps.check-dockerfile.outputs.has_dockerfile == 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ steps.context.outputs.path }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            GIT_SHA=${{ github.sha }}
+            VERSION=dev-${{ github.sha }}
+
+      - name: Skip build
+        if: steps.check-dockerfile.outputs.has_dockerfile == 'false'
+        run: echo "No Dockerfile found for ${{ matrix.module }}, skipping build"
+
+      - name: Generate build summary
+        if: steps.check-dockerfile.outputs.has_dockerfile == 'true'
+        run: |
+          echo "## Build Summary: ${{ matrix.module }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ steps.context.outputs.image_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Tags:**" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================================================
+  # Deployment Summary
+  # ============================================================================
+  summary:
+    name: Deployment Summary
+    runs-on: ubuntu-latest
+    needs: [changes, build-push]
+    if: always()
+    steps:
+      - name: Generate summary
+        run: |
+          echo "## 🚀 Dev Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Triggered by:** @${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.build-push.result }}" = "success" ]; then
+            echo "### ✅ All images built and pushed successfully" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.build-push.result }}" = "skipped" ]; then
+            echo "### ⏭️ No modules changed, build skipped" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ❌ Build failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Changed modules:** ${{ needs.changes.outputs.modules }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Notify on failure
+        if: needs.build-push.result == 'failure'
+        run: |
+          echo "::error::Deployment failed for one or more modules"
+          exit 1

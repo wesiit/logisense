@@ -219,6 +219,36 @@ services:
       - logisense-net
 
   # ===========================================================================
+  # License Service API
+  # ===========================================================================
+  license-api:
+    build:
+      context: ./platform/license-service
+      dockerfile: Dockerfile
+    container_name: logisense-license-api
+    ports:
+      - "8007:8007"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-logisense}:${POSTGRES_PASSWORD:-logisense_dev}@postgres:5432/${POSTGRES_DB:-logisense}
+      JWT_SECRET_KEY: ${LICENSE_JWT_SECRET:-logisense-license-jwt-secret-change-in-production}
+      JWT_ALGORITHM: HS256
+      MASTER_API_KEY: ${LICENSE_MASTER_API_KEY:-logisense-master-api-key-change-in-production}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8007/health')",
+        ]
+    networks:
+      - logisense-net
+
+  # ===========================================================================
   # MailHog (Email Testing)
   # ===========================================================================
   mailhog:

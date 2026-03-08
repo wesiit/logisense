@@ -263,6 +263,92 @@ services:
     networks:
       - logisense-net
 
+  # ===========================================================================
+  # Prometheus (Metrics)
+  # ===========================================================================
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: logisense-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./platform/observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./platform/observability/prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=7d"
+      - "--web.enable-lifecycle"
+      - "--web.enable-admin-api"
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
+    networks:
+      - logisense-net
+
+  # ===========================================================================
+  # Grafana (Dashboards)
+  # ===========================================================================
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: logisense-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: http://localhost:3000
+      GF_INSTALL_PLUGINS: grafana-clock-panel
+    volumes:
+      - ./platform/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./platform/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+      - loki
+    healthcheck:
+      <<: *healthcheck-defaults
+      test:
+        ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
+    networks:
+      - logisense-net
+
+  # ===========================================================================
+  # Loki (Log Aggregation)
+  # ===========================================================================
+  loki:
+    image: grafana/loki:3.0.0
+    container_name: logisense-loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./platform/observability/loki/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3100/ready"]
+    networks:
+      - logisense-net
+
+  # ===========================================================================
+  # Promtail (Log Shipper)
+  # ===========================================================================
+  promtail:
+    image: grafana/promtail:3.0.0
+    container_name: logisense-promtail
+    volumes:
+      - ./platform/observability/promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+    networks:
+      - logisense-net
+
 networks:
   logisense-net:
     name: logisense-network
@@ -277,3 +363,9 @@ volumes:
     name: logisense-minio-data
   kafka_data:
     name: logisense-kafka-data
+  prometheus_data:
+    name: logisense-prometheus-data
+  grafana_data:
+    name: logisense-grafana-data
+  loki_data:
+    name: logisense-loki-data

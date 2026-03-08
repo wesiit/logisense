@@ -1,0 +1,72 @@
+# ==============================================================================
+# LogiSense Promtail Configuration
+# ==============================================================================
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # --------------------------------------------------------------------------
+  # Docker Container Logs
+  # --------------------------------------------------------------------------
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          - name: network
+            values: ["logisense-network"]
+    relabel_configs:
+      # Keep only containers in our network
+      - source_labels: [__meta_docker_container_name]
+        regex: /(.*)
+        target_label: container
+      - source_labels: [__meta_docker_container_id]
+        target_label: container_id
+      - source_labels:
+          [__meta_docker_container_label_com_docker_compose_service]
+        target_label: service
+      - source_labels:
+          [__meta_docker_container_label_com_docker_compose_project]
+        target_label: project
+      # Add LogiSense labels
+      - source_labels: [service]
+        regex: (.+)-api
+        target_label: module
+        replacement: $1
+      - source_labels: [service]
+        regex: (postgres|redis|kafka|minio|vault|keycloak|kong)
+        target_label: infrastructure
+        replacement: $1
+    pipeline_stages:
+      # Parse JSON logs from our services
+      - json:
+          expressions:
+            level: level
+            message: message
+            timestamp: timestamp
+            event: event
+
+      # Set log level label
+      - labels:
+          level:
+
+      # Parse timestamps
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+          fallback_formats:
+            - RFC3339
+            - "2006-01-02T15:04:05.000Z"
+
+      # Add static labels
+      - static_labels:
+          env: development
+          cluster: logisense-dev

@@ -41,6 +41,7 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["ARG", "PLR2004"]
+"modules/**/api/**/*.py" = ["B008", "B904", "ARG001", "PLW0603", "PLW0602", "RUF012", "ERA001"]  # FastAPI patterns
 
 [tool.ruff.lint.isort]
 known-first-party = ["logisense"]

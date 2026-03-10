@@ -115,15 +115,17 @@ async def validate_token(
             )
 
         # Verify and decode token
+        # In development, skip issuer verification due to Docker network hostname differences
+        verify_issuer = settings.ENVIRONMENT != "development"
         payload = jwt.decode(
             token,
             rsa_key,
             algorithms=["RS256"],
             audience="account",  # Keycloak default audience
-            issuer=settings.issuer_url,
+            issuer=settings.issuer_url if verify_issuer else None,
             options={
                 "verify_aud": False,  # Keycloak doesn't always set audience
-                "verify_iss": True,
+                "verify_iss": verify_issuer,
             },
         )
 

@@ -33,15 +33,15 @@
 set -euo pipefail
 
 # Configuration
-KEYCLOAK_URL="${KEYCLOAK_URL:-http://localhost:8180}"
+KEYCLOAK_URL="${KEYCLOAK_URL:-http://localhost:8080}"
 IWMS_API_URL="${IWMS_API_URL:-http://localhost:8011}"
 UOIH_API_URL="${UOIH_API_URL:-http://localhost:8006}"
 FACILITY_ID="${FACILITY_ID:-TEST-FACILITY-001}"
 TEST_USER="${TEST_USER:-manager@logisense.io}"
-TEST_PASSWORD="${TEST_PASSWORD:-manager123}"
+TEST_PASSWORD="${TEST_PASSWORD:-Test1234!Dev}"
 KEYCLOAK_REALM="${KEYCLOAK_REALM:-logisense}"
 KEYCLOAK_CLIENT_ID="${KEYCLOAK_CLIENT_ID:-logisense-api}"
-KEYCLOAK_CLIENT_SECRET="${KEYCLOAK_CLIENT_SECRET:-}"
+KEYCLOAK_CLIENT_SECRET="${KEYCLOAK_CLIENT_SECRET:-logisense-api-secret-dev}"
 PIPELINE_WAIT_SECONDS="${PIPELINE_WAIT_SECONDS:-30}"
 SKIP_AUTH="${SKIP_AUTH:-false}"
 
@@ -68,12 +68,12 @@ log_info() {
 
 log_pass() {
     echo -e "${GREEN}[PASS]${NC} $1"
-    ((PASS_COUNT++))
+    ((++PASS_COUNT)) || true
 }
 
 log_fail() {
     echo -e "${RED}[FAIL]${NC} $1"
-    ((FAIL_COUNT++))
+    ((++FAIL_COUNT)) || true
 }
 
 check_dependency() {

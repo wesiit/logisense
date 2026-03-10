@@ -6,7 +6,7 @@ dependencies = [
   "fastapi>=0.111", "uvicorn[standard]", "sqlalchemy[asyncio]>=2.0",
   "asyncpg", "pydantic-settings>=2.0", "aiokafka", "structlog",
   "prometheus-fastapi-instrumentator", "python-jose[cryptography]",
-  "httpx", "alembic"
+  "httpx", "alembic", "python-json-logger"
 ]
 [project.optional-dependencies]
 dev = ["pytest", "pytest-asyncio", "httpx", "pytest-cov"]

@@ -1,59 +1,71 @@
 # ==============================================================================
-# LogiSense iWMS API Dockerfile
+# LogiSense iWMS API - Production Multi-Stage Dockerfile
 # ==============================================================================
 
-FROM python:3.12-slim as builder
+# ------------------------------------------------------------------------------
+# Stage 1: Builder
+# ------------------------------------------------------------------------------
+FROM python:3.12-slim AS builder
 
-WORKDIR /app
+WORKDIR /build
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements
+# Create virtualenv at /opt/venv
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Upgrade pip
+RUN pip install --no-cache-dir --upgrade pip wheel setuptools
+
+# Copy dependency files
 COPY pyproject.toml .
 
-# Install dependencies
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir .
+# Install dependencies into virtualenv
+RUN pip install --no-cache-dir .
 
-# ==============================================================================
-# Production image
-# ==============================================================================
+# ------------------------------------------------------------------------------
+# Stage 2: Runtime
+# ------------------------------------------------------------------------------
+FROM python:3.12-slim AS runtime
 
-FROM python:3.12-slim
+# Install runtime dependencies (curl for healthcheck)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Create non-root user
+RUN groupadd -g 1000 logisense && \
+    useradd -u 1000 -g logisense -m -s /bin/bash logisense
+
+# Copy virtualenv from builder
+COPY --from=builder /opt/venv /opt/venv
+
+# Set environment variables
+ENV PATH="/opt/venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONFAULTHANDLER=1
 
 WORKDIR /app
 
-# Create non-root user
-RUN groupadd -r iwms && useradd -r -g iwms iwms
-
-# Copy installed packages from builder
-COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
-
-# Copy application code
-COPY api/ /app/api/
-COPY db/ /app/db/
-
-# Set ownership
-RUN chown -R iwms:iwms /app
-
-# Switch to non-root user
-USER iwms
-
-# Environment variables
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PORT=8001
+# Copy application source code (preserve package structure)
+COPY --chown=logisense:logisense api/ /app/api/
 
 # Expose port
-EXPOSE 8001
+EXPOSE 8011
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import httpx; httpx.get('http://localhost:8001/health').raise_for_status()"
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8011/health || exit 1
 
-# Run the application
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8001"]
+# Switch to non-root user
+USER logisense
+
+# Run uvicorn with structured logging
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8011", "--workers", "2", "--log-config", "api/log-config.json"]

@@ -45,7 +45,7 @@ scrape_configs:
   - job_name: iwms-api
     static_configs:
       - targets:
-          - iwms-api:8001
+          - iwms-api:8011
     metrics_path: /metrics
 
   - job_name: lip-api

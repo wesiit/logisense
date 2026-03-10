@@ -12,7 +12,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 
 from .config import get_settings
 from .db import close_db, init_db
-from .logging import bind_request_context, setup_logging
+from .log_setup import bind_request_context, setup_logging
 from .routers import (
     health_router,
     inventory_router,
@@ -133,7 +133,11 @@ def create_app() -> FastAPI:
         )
 
     # Prometheus metrics
-    Instrumentator().instrument(app).expose(app, endpoint="/metrics")
+    Instrumentator(
+        should_group_status_codes=True,
+        should_group_untemplated=True,
+        excluded_handlers=["/health", "/metrics"],
+    ).instrument(app).expose(app, endpoint="/metrics")
 
     # Include routers
     app.include_router(health_router)

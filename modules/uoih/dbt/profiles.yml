@@ -1,0 +1,31 @@
+# dbt profile for LogiSense Iceberg/Trino setup
+# This file should be copied to ~/.dbt/profiles.yml or DBT_PROFILES_DIR
+
+logisense_iceberg:
+  target: dev
+  outputs:
+    dev:
+      type: trino
+      method: none
+      host: trino
+      port: 8080
+      catalog: iceberg
+      schema: gold
+      threads: 4
+      http_scheme: http
+      session_properties:
+        query_max_run_time: 30m
+
+    prod:
+      type: trino
+      method: ldap
+      host: "{{ env_var('TRINO_HOST', 'trino') }}"
+      port: "{{ env_var('TRINO_PORT', '8443') | int }}"
+      catalog: iceberg
+      schema: gold
+      threads: 8
+      http_scheme: https
+      user: "{{ env_var('TRINO_USER') }}"
+      password: "{{ env_var('TRINO_PASSWORD') }}"
+      session_properties:
+        query_max_run_time: 1h

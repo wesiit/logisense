@@ -1,0 +1,74 @@
+{
+  "version": 1,
+  "disable_existing_loggers": false,
+  "formatters": {
+    "json": {
+      "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
+      "format": "%(asctime)s %(levelname)s %(name)s %(message)s %(pathname)s %(lineno)d %(funcName)s",
+      "datefmt": "%Y-%m-%dT%H:%M:%S%z",
+      "rename_fields": {
+        "asctime": "timestamp",
+        "levelname": "level",
+        "name": "logger",
+        "pathname": "file",
+        "lineno": "line",
+        "funcName": "function"
+      },
+      "static_fields": {
+        "service": "uoih-api",
+        "version": "0.1.0"
+      }
+    },
+    "access": {
+      "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
+      "format": "%(asctime)s %(levelname)s %(message)s",
+      "datefmt": "%Y-%m-%dT%H:%M:%S%z",
+      "rename_fields": {
+        "asctime": "timestamp",
+        "levelname": "level"
+      },
+      "static_fields": {
+        "service": "uoih-api",
+        "type": "access"
+      }
+    }
+  },
+  "handlers": {
+    "default": {
+      "class": "logging.StreamHandler",
+      "stream": "ext://sys.stdout",
+      "formatter": "json"
+    },
+    "access": {
+      "class": "logging.StreamHandler",
+      "stream": "ext://sys.stdout",
+      "formatter": "access"
+    }
+  },
+  "loggers": {
+    "uvicorn": {
+      "handlers": ["default"],
+      "level": "INFO",
+      "propagate": false
+    },
+    "uvicorn.error": {
+      "handlers": ["default"],
+      "level": "INFO",
+      "propagate": false
+    },
+    "uvicorn.access": {
+      "handlers": ["access"],
+      "level": "INFO",
+      "propagate": false
+    },
+    "sqlalchemy.engine": {
+      "handlers": ["default"],
+      "level": "WARNING",
+      "propagate": false
+    }
+  },
+  "root": {
+    "handlers": ["default"],
+    "level": "INFO"
+  }
+}

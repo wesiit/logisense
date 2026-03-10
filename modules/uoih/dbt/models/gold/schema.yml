@@ -1,0 +1,74 @@
+version: 2
+
+sources:
+  - name: silver
+    description: Silver layer - cleansed and validated data
+    database: iceberg
+    schema: silver
+    tables:
+      - name: iwms_inventory_movements
+        description: Validated inventory movement events
+        columns:
+          - name: event_id
+            description: Unique event identifier
+          - name: facility_id
+            description: Facility where movement occurred
+          - name: location_id
+            description: Storage location ID
+          - name: sku_id
+            description: Product SKU identifier
+          - name: lot_number
+            description: Lot/batch number
+          - name: movement_type
+            description: Type of movement (RECEIVE, PICK, PUTAWAY, TRANSFER, ADJUST, CYCLE_COUNT)
+          - name: quantity
+            description: Quantity moved
+          - name: performed_at
+            description: Timestamp when movement was performed
+          - name: performed_by
+            description: User who performed the movement
+          - name: reference_id
+            description: Reference ID (order ID, PO number, etc.)
+
+      - name: iwms_inventory_positions
+        description: Current inventory positions by location
+        columns:
+          - name: facility_id
+            description: Facility identifier
+          - name: location_id
+            description: Storage location ID
+          - name: sku_id
+            description: Product SKU identifier
+          - name: lot_number
+            description: Lot/batch number
+          - name: quantity_on_hand
+            description: Current quantity at location
+
+models:
+  - name: dc_daily_kpis
+    description: Daily KPI metrics per distribution center/facility
+    columns:
+      - name: facility_id
+        description: Facility identifier
+        tests:
+          - not_null
+      - name: date
+        description: Date of the KPIs
+        tests:
+          - not_null
+      - name: total_movements
+        description: Total count of inventory movements
+      - name: picks_completed
+        description: Count of PICK type movements
+      - name: inventory_accuracy_pct
+        description: Percentage of cycle counts with no variance
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+      - name: orders_fulfilled
+        description: Count of distinct orders dispatched
+      - name: cycle_counts
+        description: Total number of cycle counts performed
+      - name: computed_at
+        description: Timestamp when KPIs were computed

@@ -1,0 +1,25 @@
+[project]
+name = "logisense-uoih"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.111", "uvicorn[standard]", "sqlalchemy[asyncio]>=2.0",
+  "asyncpg", "pydantic-settings>=2.0", "structlog", "python-json-logger",
+  "prometheus-fastapi-instrumentator", "httpx",
+  "pyiceberg[pyarrow,s3fs]>=0.6", "pyarrow>=15.0"
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-asyncio", "httpx", "pytest-cov"]
+airflow = [
+  "apache-airflow>=2.8", "apache-airflow-providers-apache-kafka",
+  "great-expectations>=0.18", "dbt-core>=1.7", "dbt-trino>=1.7"
+]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["api*", "db*"]

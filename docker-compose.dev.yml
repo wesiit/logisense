@@ -282,6 +282,35 @@ services:
       - logisense-net
 
   # ===========================================================================
+  # UOIH API (Unified Operations Intelligence Hub)
+  # ===========================================================================
+  uoih-api:
+    build:
+      context: ./modules/uoih
+      dockerfile: Dockerfile
+    container_name: logisense-uoih-api
+    ports:
+      - "8006:8006"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-logisense}:${POSTGRES_PASSWORD:-logisense_dev}@postgres:5432/${POSTGRES_DB:-logisense}
+      ICEBERG_CATALOG_URI: http://iceberg-rest:8181
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      ENVIRONMENT: development
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD", "curl", "-f", "http://localhost:8006/health"]
+    networks:
+      - logisense-net
+
+  # ===========================================================================
   # MailHog (Email Testing)
   # ===========================================================================
   mailhog:
@@ -381,6 +410,100 @@ services:
     networks:
       - logisense-net
 
+  # ===========================================================================
+  # Airflow (Data Orchestration)
+  # ===========================================================================
+  airflow-init:
+    image: apache/airflow:2.8.4
+    container_name: logisense-airflow-init
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        airflow db init
+        airflow users create \
+          --username admin \
+          --password admin \
+          --firstname Admin \
+          --lastname User \
+          --role Admin \
+          --email admin@logisense.io || true
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER:-logisense}:${POSTGRES_PASSWORD:-logisense_dev}@postgres:5432/airflow
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:-}
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - logisense-net
+
+  airflow-webserver:
+    image: apache/airflow:2.8.4
+    container_name: logisense-airflow-webserver
+    command: webserver
+    ports:
+      - "8085:8080"
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER:-logisense}:${POSTGRES_PASSWORD:-logisense_dev}@postgres:5432/airflow
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:-}
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
+      AIRFLOW__WEBSERVER__RBAC: "true"
+    volumes:
+      - ./platform/data-platform/airflow/dags:/opt/airflow/dags:ro
+      - ./modules/uoih/dbt:/opt/airflow/dbt/uoih:ro
+      - airflow_logs:/opt/airflow/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      start_period: 60s
+    networks:
+      - logisense-net
+
+  airflow-scheduler:
+    image: apache/airflow:2.8.4
+    container_name: logisense-airflow-scheduler
+    command: scheduler
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER:-logisense}:${POSTGRES_PASSWORD:-logisense_dev}@postgres:5432/airflow
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:-}
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      # Connections for DAGs
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      ICEBERG_CATALOG_URI: http://iceberg-rest:8181
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      UOIH_API_URL: http://uoih-api:8006
+    volumes:
+      - ./platform/data-platform/airflow/dags:/opt/airflow/dags:ro
+      - ./modules/uoih/dbt:/opt/airflow/dbt/uoih:ro
+      - airflow_logs:/opt/airflow/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD", "airflow", "jobs", "check", "--job-type", "SchedulerJob"]
+      start_period: 60s
+    networks:
+      - logisense-net
+
 networks:
   logisense-net:
     name: logisense-network
@@ -401,3 +524,5 @@ volumes:
     name: logisense-grafana-data
   loki_data:
     name: logisense-loki-data
+  airflow_logs:
+    name: logisense-airflow-logs

@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "iwms.configmapName" . }}
+  labels:
+    {{- include "iwms.labels" . | nindent 4 }}
+data:
+  SERVICE_NAME: {{ .Values.env.SERVICE_NAME | quote }}
+  KAFKA_BOOTSTRAP_SERVERS: {{ .Values.env.KAFKA_BOOTSTRAP_SERVERS | quote }}
+  KEYCLOAK_URL: {{ .Values.env.KEYCLOAK_URL | quote }}
+  KEYCLOAK_REALM: {{ .Values.env.KEYCLOAK_REALM | quote }}
+  LOG_LEVEL: {{ .Values.env.LOG_LEVEL | default "INFO" | quote }}
+  LOG_FORMAT: {{ .Values.env.LOG_FORMAT | default "json" | quote }}
+  {{- if .Values.env.DATABASE_URL }}
+  DATABASE_URL: {{ .Values.env.DATABASE_URL | quote }}
+  {{- end }}
+  {{- range $key, $value := .Values.env }}
+  {{- if and (ne $key "DATABASE_URL") (ne $key "SERVICE_NAME") (ne $key "KAFKA_BOOTSTRAP_SERVERS") (ne $key "KEYCLOAK_URL") (ne $key "KEYCLOAK_REALM") (ne $key "LOG_LEVEL") (ne $key "LOG_FORMAT") }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+  {{- end }}

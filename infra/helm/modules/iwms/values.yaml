@@ -1,0 +1,196 @@
+# Default values for logisense-iwms
+# This is a YAML-formatted file.
+
+replicaCount: 2
+
+image:
+  repository: harbor.logisense.internal/logisense/iwms-api
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/path: "/metrics"
+  prometheus.io/port: "8011"
+
+podLabels: {}
+
+podSecurityContext:
+  fsGroup: 1000
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 8011
+  targetPort: 8011
+  annotations: {}
+
+ingress:
+  enabled: false
+  className: ""
+  annotations:
+    {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: iwms.logisense.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  #  - secretName: iwms-tls
+  #    hosts:
+  #      - iwms.logisense.local
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 256Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  # targetMemoryUtilizationPercentage: 80
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 15
+  timeoutSeconds: 5
+  failureThreshold: 3
+  successThreshold: 1
+
+readinessProbe:
+  httpGet:
+    path: /ready
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+  successThreshold: 1
+
+# Environment variables (non-secret)
+env:
+  DATABASE_URL: "" # Set via secret or vault
+  KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+  KEYCLOAK_URL: "http://keycloak:8080"
+  KEYCLOAK_REALM: "logisense"
+  SERVICE_NAME: "iwms-api"
+  LOG_LEVEL: "INFO"
+  LOG_FORMAT: "json"
+
+# Extra environment variables from secrets
+envFromSecrets:
+  []
+  # - name: DATABASE_URL
+  #   secretName: iwms-db-credentials
+  #   secretKey: url
+
+# Extra environment variables from configmaps
+envFromConfigMaps: []
+
+# Vault integration for secrets
+vault:
+  enabled: true
+  role: "logisense-app"
+  secretPath: "logisense/dev"
+  # Vault agent injector annotations
+  annotations:
+    vault.hashicorp.com/agent-inject: "true"
+    vault.hashicorp.com/agent-inject-status: "update"
+    vault.hashicorp.com/agent-inject-secret-config: "logisense/dev"
+    vault.hashicorp.com/agent-inject-template-config: |
+      {{- with secret "logisense/dev" -}}
+      export DATABASE_URL="{{ .Data.data.database_url }}"
+      export JWT_SECRET="{{ .Data.data.jwt_secret }}"
+      {{- end }}
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - iwms
+          topologyKey: kubernetes.io/hostname
+
+# Topology spread constraints for better distribution
+topologySpreadConstraints:
+  []
+  # - maxSkew: 1
+  #   topologyKey: topology.kubernetes.io/zone
+  #   whenUnsatisfiable: ScheduleAnyway
+  #   labelSelector:
+  #     matchLabels:
+  #       app.kubernetes.io/name: iwms
+
+# Pod disruption budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+  # maxUnavailable: 1
+
+# Extra volumes
+volumes:
+  []
+  # - name: tmp
+  #   emptyDir: {}
+
+# Extra volume mounts
+volumeMounts:
+  []
+  # - name: tmp
+  #   mountPath: /tmp
+
+# Init containers
+initContainers: []
+
+# Sidecar containers
+extraContainers: []
+
+# Network policy
+networkPolicy:
+  enabled: false
+  ingress: []
+  egress: []

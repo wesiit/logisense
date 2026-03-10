@@ -1,0 +1,18 @@
+apiVersion: v2
+name: logisense-iwms
+description: LogiSense intelligent Warehouse Management System (iWMS) API
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - warehouse
+  - wms
+  - logistics
+  - inventory
+maintainers:
+  - name: LogiSense Team
+    email: platform@logisense.io
+home: https://github.com/logisense/logisense
+sources:
+  - https://github.com/logisense/logisense
+dependencies: []

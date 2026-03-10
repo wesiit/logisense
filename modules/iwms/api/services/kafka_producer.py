@@ -137,6 +137,27 @@ class KafkaProducer:
         await self._send(TOPIC_WAVE_RELEASED, str(facility_id), event)
 
 
+class MockKafkaProducer(KafkaProducer):
+    """Mock Kafka producer for testing - does not connect to Kafka."""
+
+    def __init__(self) -> None:
+        self._started = True
+        self._messages: list[dict[str, Any]] = []
+
+    async def start(self) -> None:
+        """No-op for mock."""
+        pass
+
+    async def stop(self) -> None:
+        """No-op for mock."""
+        pass
+
+    async def _send(self, topic: str, key: str, value: dict[str, Any]) -> None:
+        """Store message instead of sending to Kafka."""
+        self._messages.append({"topic": topic, "key": key, "value": value})
+        logger.debug("mock_kafka_message_stored", topic=topic, key=key)
+
+
 # Global producer instance
 _producer: KafkaProducer | None = None
 
@@ -144,6 +165,12 @@ _producer: KafkaProducer | None = None
 async def init_kafka_producer(settings: Settings) -> KafkaProducer:
     """Initialize the global Kafka producer."""
     global _producer
+
+    if settings.TEST_MODE:
+        _producer = MockKafkaProducer()
+        logger.info("mock_kafka_producer_initialized")
+        return _producer
+
     _producer = KafkaProducer(settings)
     await _producer.start()
     return _producer

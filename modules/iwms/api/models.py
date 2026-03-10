@@ -1,8 +1,9 @@
 """SQLAlchemy ORM models for iWMS schema."""
 
+import os
 from datetime import date, datetime
 from decimal import Decimal
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import (
     Boolean,
@@ -20,8 +21,29 @@ from sqlalchemy.sql import func
 
 from .db import Base
 
-# Schema name
-SCHEMA = "iwms"
+# Test mode flag - affects schema and server defaults
+TEST_MODE = os.environ.get("TEST_MODE") == "true"
+
+# Schema name - use None for SQLite (tests), "iwms" for PostgreSQL
+SCHEMA = None if TEST_MODE else "iwms"
+
+
+def fk_ref(table_column: str) -> str:
+    """Generate FK reference with or without schema prefix."""
+    if SCHEMA:
+        return f"{SCHEMA}.{table_column}"
+    return table_column
+
+
+def pk_uuid() -> dict:
+    """Return kwargs for UUID primary key column."""
+    kwargs = {
+        "primary_key": True,
+        "default": uuid4,  # Python-level default for tests
+    }
+    if not TEST_MODE:
+        kwargs["server_default"] = func.gen_random_uuid()
+    return kwargs
 
 
 class Location(Base):
@@ -30,9 +52,7 @@ class Location(Base):
     __tablename__ = "locations"
     __table_args__ = {"schema": SCHEMA}
 
-    id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
-    )
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), **pk_uuid())
     facility_id: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     zone_id: Mapped[str | None] = mapped_column(String(50), index=True)
     aisle: Mapped[str | None] = mapped_column(String(20))
@@ -61,9 +81,7 @@ class SKU(Base):
     __tablename__ = "skus"
     __table_args__ = {"schema": SCHEMA}
 
-    id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
-    )
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), **pk_uuid())
     sku_code: Mapped[str] = mapped_column(
         String(100), unique=True, nullable=False, index=True
     )
@@ -97,19 +115,17 @@ class InventoryPosition(Base):
     __tablename__ = "inventory_positions"
     __table_args__ = {"schema": SCHEMA}
 
-    id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
-    )
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), **pk_uuid())
     facility_id: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     location_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
-        ForeignKey(f"{SCHEMA}.locations.id"),
+        ForeignKey(fk_ref("locations.id")),
         nullable=False,
         index=True,
     )
     sku_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
-        ForeignKey(f"{SCHEMA}.skus.id"),
+        ForeignKey(fk_ref("skus.id")),
         nullable=False,
         index=True,
     )
@@ -139,20 +155,18 @@ class InventoryMovement(Base):
     __tablename__ = "inventory_movements"
     __table_args__ = {"schema": SCHEMA}
 
-    id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
-    )
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), **pk_uuid())
     facility_id: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     movement_type: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     from_location_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey(f"{SCHEMA}.locations.id"), index=True
+        PG_UUID(as_uuid=True), ForeignKey(fk_ref("locations.id")), index=True
     )
     to_location_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey(f"{SCHEMA}.locations.id"), index=True
+        PG_UUID(as_uuid=True), ForeignKey(fk_ref("locations.id")), index=True
     )
     sku_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
-        ForeignKey(f"{SCHEMA}.skus.id"),
+        ForeignKey(fk_ref("skus.id")),
         nullable=False,
         index=True,
     )
@@ -180,9 +194,7 @@ class Order(Base):
     __tablename__ = "orders"
     __table_args__ = {"schema": SCHEMA}
 
-    id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
-    )
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), **pk_uuid())
     facility_id: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     order_number: Mapped[str] = mapped_column(
         String(100), unique=True, nullable=False, index=True
@@ -218,18 +230,16 @@ class OrderLine(Base):
     __tablename__ = "order_lines"
     __table_args__ = {"schema": SCHEMA}
 
-    id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
-    )
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), **pk_uuid())
     order_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
-        ForeignKey(f"{SCHEMA}.orders.id", ondelete="CASCADE"),
+        ForeignKey(fk_ref("orders.id"), ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     sku_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
-        ForeignKey(f"{SCHEMA}.skus.id"),
+        ForeignKey(fk_ref("skus.id")),
         nullable=False,
         index=True,
     )
@@ -260,9 +270,7 @@ class Wave(Base):
     __tablename__ = "waves"
     __table_args__ = {"schema": SCHEMA}
 
-    id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
-    )
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), **pk_uuid())
     facility_id: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     wave_number: Mapped[str] = mapped_column(
         String(100), unique=True, nullable=False, index=True
@@ -300,12 +308,10 @@ class Task(Base):
     __tablename__ = "tasks"
     __table_args__ = {"schema": SCHEMA}
 
-    id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
-    )
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), **pk_uuid())
     facility_id: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     wave_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey(f"{SCHEMA}.waves.id"), index=True
+        PG_UUID(as_uuid=True), ForeignKey(fk_ref("waves.id")), index=True
     )
     task_type: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     status: Mapped[str] = mapped_column(
@@ -316,14 +322,14 @@ class Task(Base):
         index=True,
     )
     from_location_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey(f"{SCHEMA}.locations.id"), index=True
+        PG_UUID(as_uuid=True), ForeignKey(fk_ref("locations.id")), index=True
     )
     to_location_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey(f"{SCHEMA}.locations.id"), index=True
+        PG_UUID(as_uuid=True), ForeignKey(fk_ref("locations.id")), index=True
     )
     sku_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
-        ForeignKey(f"{SCHEMA}.skus.id"),
+        ForeignKey(fk_ref("skus.id")),
         nullable=False,
         index=True,
     )

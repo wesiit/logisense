@@ -72,6 +72,17 @@ async def validate_token(
     settings: Settings = Depends(get_settings),
 ) -> TokenPayload:
     """Validate JWT token and return payload."""
+    # Test mode bypass - return mock token payload
+    if settings.TEST_MODE:
+        return TokenPayload(
+            sub="test-user-id",
+            email="test@logisense.io",
+            preferred_username="test-user",
+            name="Test User",
+            facility_id=None,  # Allow access to all facilities in test mode
+            roles=["admin", "warehouse-manager"],
+        )
+
     if not credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

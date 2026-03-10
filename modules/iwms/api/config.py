@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     SERVICE_NAME: str = "iwms-api"
     SERVICE_VERSION: str = "0.1.0"
     DEBUG: bool = False
+    TEST_MODE: bool = False  # Bypasses JWT validation when True
 
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://logisense:logisense_dev@localhost:5432/logisense"  # pragma: allowlist secret
